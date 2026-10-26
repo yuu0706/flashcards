@@ -2,5 +2,9 @@
 #
 # ローカルでは Cloudflare Access を経由できないため、DEV_AUTH_EMAIL に書いたメールアドレスの
 # 利用者としてログイン済み扱いにする。接続先が localhost のときだけ効く(src/worker/auth.ts)。
-# 本番の vars / secret には設定しない。
+# 本番の secret には設定しない。
 DEV_AUTH_EMAIL="you@example.com"
+# 本番では wrangler secret put で入れる。ローカルは空でよい(DEV_AUTH_EMAIL のバイパスが先に効く)。
+# 空でも書いておくのは、wrangler types が Env の型を .dev.vars から作るため
+ACCESS_TEAM_DOMAIN=""
+ACCESS_AUD=""

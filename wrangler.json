@@ -18,18 +18,17 @@
 			"binding": "DB",
 			"database_name": "flashcards",
 			// `wrangler d1 create flashcards` の出力の database_id に置き換える。
-			// ローカル開発とテストはこの値を使わない(ローカルの SQLite が作られる)
-			"database_id": "REPLACE_WITH_D1_DATABASE_ID",
+			// ローカル開発とテストはこの値を使わない(ローカルの SQLite が作られる)。
+			// 識別子であり、アカウントの API トークンが無ければ使えないため、リポジトリに置いている
+			"database_id": "e4e4852d-fb65-4ab5-a249-5cfbb9f6ed35",
 			"migrations_dir": "migrations"
 		}
 	],
-	// Cloudflare Access(Zero Trust)の設定。機密ではないので vars に置く。
-	//   ACCESS_TEAM_DOMAIN: Zero Trust のチームドメイン(例: example.cloudflareaccess.com)
-	//   ACCESS_AUD:         Access アプリケーションの Application Audience (AUD) タグ
-	// 空のままデプロイすると /api/* は 500 を返し、誰も通れない(安全側)。
+	// Cloudflare Access(Zero Trust)の設定は vars に書かず、デプロイ後に secret として入れる(README「初回のデプロイ」)。
+	//   wrangler secret put ACCESS_TEAM_DOMAIN   Zero Trust のチームドメイン(例: example.cloudflareaccess.com)
+	//   wrangler secret put ACCESS_AUD           Access アプリケーションの Application Audience (AUD) タグ
+	// どちらも識別子で機密ではないが、配置ごとに違う値をリポジトリに残さないため secret にしている。
+	// 未設定のまま動かすと /api/* は 500 を返し、誰も通れない(安全側)。
 	// ローカル開発は .dev.vars の DEV_AUTH_EMAIL を使う(.dev.vars.example 参照)
-	"vars": {
-		"ACCESS_TEAM_DOMAIN": "",
-		"ACCESS_AUD": ""
-	}
+	"vars": {}
 }
