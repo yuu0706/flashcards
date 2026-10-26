@@ -17,6 +17,7 @@ const CARD_COLUMNS = {
 	back: cards.back,
 	note: cards.note,
 	tags: cards.tags,
+	choices: cards.choices,
 	state: cards.state,
 	due: cards.due,
 	intervalDays: cards.intervalDays,
@@ -28,7 +29,7 @@ const CARD_COLUMNS = {
 	updatedAt: cards.updatedAt,
 };
 
-const LIMITS = { front: 2000, back: 4000, note: 4000, tag: 50, tags: 20, importRows: 2000 };
+const LIMITS = { front: 2000, back: 4000, note: 4000, tag: 50, tags: 20, choice: 500, choices: 5, importRows: 2000 };
 
 type Ctx = Context<AppEnv>;
 
@@ -53,11 +54,12 @@ async function ownCard(c: Ctx, id: string) {
 }
 
 function cardInput(body: Record<string, unknown>, partial: boolean) {
-	const out: Partial<{ front: string; back: string; note: string; tags: string[] }> = {};
+	const out: Partial<{ front: string; back: string; note: string; tags: string[]; choices: string[] }> = {};
 	if (!partial || "front" in body) out.front = str(body["front"], "表", { max: LIMITS.front, required: true });
 	if (!partial || "back" in body) out.back = str(body["back"], "裏", { max: LIMITS.back, required: true });
 	if (!partial || "note" in body) out.note = str(body["note"], "補足", { max: LIMITS.note });
 	if (!partial || "tags" in body) out.tags = strArray(body["tags"], "タグ", { maxItems: LIMITS.tags, maxLen: LIMITS.tag });
+	if (!partial || "choices" in body) out.choices = strArray(body["choices"], "選択肢", { maxItems: LIMITS.choices, maxLen: LIMITS.choice });
 	return out;
 }
 
@@ -96,7 +98,7 @@ cardRoutes.post("/decks/:deckId/cards", async (c) => {
 	const input = cardInput(await jsonBody(c.req.raw), false);
 	const inserted = await db
 		.insert(cards)
-		.values({ deckId, userId: actor.id, front: input.front!, back: input.back!, note: input.note ?? "", tags: input.tags ?? [] })
+		.values({ deckId, userId: actor.id, front: input.front!, back: input.back!, note: input.note ?? "", tags: input.tags ?? [], choices: input.choices ?? [] })
 		.returning(CARD_COLUMNS);
 	return c.json({ card: inserted[0] }, 201);
 });
@@ -114,24 +116,31 @@ cardRoutes.post("/decks/:deckId/cards/import", async (c) => {
 		if (p.front.length > LIMITS.front || p.back.length > LIMITS.back || p.note.length > LIMITS.note) {
 			throw new ValidationError("1つの札の文字数が上限を超えています");
 		}
+		if (p.choices.length > LIMITS.choices || p.choices.some((x) => x.length > LIMITS.choice)) {
+			throw new ValidationError(`選択肢は${LIMITS.choices}件まで、1件${LIMITS.choice}文字以内にしてください`);
+		}
 	}
-	// D1 の batch は1回の往復でまとめて実行する。1行ずつ insert すると行数分の往復になる
+	// 本番の D1 は1つの SQL に結び付けられる値が 100 個までのため、複数行をまとめた INSERT は使えない。
+	// 1行ずつの INSERT を batch で1回の往復にまとめる(手元の SQLite はこの制限が無く、テストでは気付けない)
 	const now = new Date().toISOString();
 	const BATCH = 100;
 	let inserted = 0;
 	for (let i = 0; i < parsed.length; i += BATCH) {
-		const chunk = parsed.slice(i, i + BATCH).map((p, j) => ({
-			deckId,
-			userId: actor.id,
-			front: p.front,
-			back: p.back,
-			note: p.note,
-			tags: p.tags.slice(0, LIMITS.tags),
-			// 作成順(= 取り込みの行順)を保つため、ミリ秒を1ずつずらす
-			createdAt: new Date(Date.parse(now) + i + j).toISOString(),
-		}));
-		await db.insert(cards).values(chunk);
-		inserted += chunk.length;
+		const statements = parsed.slice(i, i + BATCH).map((p, j) =>
+			db.insert(cards).values({
+				deckId,
+				userId: actor.id,
+				front: p.front,
+				back: p.back,
+				note: p.note,
+				tags: p.tags.slice(0, LIMITS.tags),
+				choices: p.choices,
+				// 作成順(= 取り込みの行順)を保つため、ミリ秒を1ずつずらす
+				createdAt: new Date(Date.parse(now) + i + j).toISOString(),
+			}),
+		);
+		await db.batch(statements as [(typeof statements)[number], ...typeof statements]);
+		inserted += statements.length;
 	}
 	return c.json({ inserted, skipped }, 201);
 });
@@ -142,7 +151,7 @@ cardRoutes.get("/decks/:deckId/cards/export", async (c) => {
 	const deckId = await ownDeckId(c, c.req.param("deckId"));
 	if (!deckId) return c.json({ error: "単語帳が見つかりません" }, 404);
 	const rows = await db
-		.select({ front: cards.front, back: cards.back, note: cards.note, tags: cards.tags })
+		.select({ front: cards.front, back: cards.back, note: cards.note, tags: cards.tags, choices: cards.choices })
 		.from(cards)
 		.where(eq(cards.deckId, deckId))
 		.orderBy(asc(cards.createdAt));

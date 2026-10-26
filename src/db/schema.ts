@@ -5,7 +5,7 @@
 import { sql } from "drizzle-orm";
 import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-import { CARD_STATES, RATINGS } from "../lib/scheduler";
+import { CARD_STATES, DECK_MODES, RATINGS } from "../lib/scheduler";
 
 const isoTimestampDefault = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
 const idDefault = sql`(lower(hex(randomblob(16))))`;
@@ -25,6 +25,7 @@ export const decks = sqliteTable(
 			.references(() => users.id, { onDelete: "cascade" }),
 		name: text("name").notNull(),
 		newPerDay: integer("new_per_day").notNull().default(20),
+		mode: text("mode", { enum: DECK_MODES }).notNull().default("recall"),
 		createdAt: text("created_at").notNull().default(isoTimestampDefault),
 		updatedAt: text("updated_at").notNull().default(isoTimestampDefault),
 	},
@@ -45,6 +46,7 @@ export const cards = sqliteTable(
 		back: text("back").notNull(),
 		note: text("note").notNull().default(""),
 		tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
+		choices: text("choices", { mode: "json" }).$type<string[]>().notNull().default([]),
 		state: text("state", { enum: CARD_STATES }).notNull().default("new"),
 		due: text("due"),
 		intervalDays: integer("interval_days").notNull().default(0),

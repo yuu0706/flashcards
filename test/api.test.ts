@@ -50,7 +50,7 @@ describe("認証", () => {
 	it("初回アクセスで利用者が作られ、/api/me が返る", async () => {
 		const r = await call("GET", `/api/me?today=${TODAY}`);
 		expect(r.status).toBe(200);
-		expect(r.body).toEqual({ email: "dev@example.com", reviewedToday: 0 });
+		expect(r.body).toEqual({ email: "dev@example.com", reviewedToday: 0, streakDays: 0 });
 	});
 });
 
@@ -86,6 +86,17 @@ describe("単語帳", () => {
 	});
 });
 
+describe("単語帳の出題の形式", () => {
+	it("既定は recall。PATCH で choice に変えられ、不正な値は 400", async () => {
+		const deck = await createDeck();
+		expect((await call("GET", `/api/decks/${deck.id}`)).body).toMatchObject({ deck: { mode: "recall" } });
+		const changed = await call("PATCH", `/api/decks/${deck.id}`, { json: { mode: "choice" } });
+		expect(changed.status).toBe(200);
+		expect(changed.body).toMatchObject({ deck: { mode: "choice" } });
+		expect((await call("PATCH", `/api/decks/${deck.id}`, { json: { mode: "quiz" } })).status).toBe(400);
+	});
+});
+
 describe("札", () => {
 	it("追加・検索・更新・削除", async () => {
 		const deck = await createDeck();
@@ -107,6 +118,23 @@ describe("札", () => {
 		expect((await call("GET", `/api/decks/${deck.id}/cards`)).body).toMatchObject({ cards: [{ front: "UDP" }] });
 	});
 
+	it("四択の誤答を札に持て、学習の応答には同じ単語帳の裏の候補が付く", async () => {
+		const deck = await createDeck();
+		const made = await call("POST", `/api/decks/${deck.id}/cards`, { json: { front: "Q", back: "正", choices: ["誤1", "誤2", "誤1", ""] } });
+		expect(made.status).toBe(201);
+		expect((made.body as { card: Json }).card).toMatchObject({ choices: ["誤1", "誤2"] });
+		await createCard(deck.id, "Q2", "他の裏");
+
+		const study = await call("GET", `/api/decks/${deck.id}/study?today=${TODAY}`);
+		expect(study.status).toBe(200);
+		const body = study.body as { cards: { choices: string[] }[]; pool: string[] };
+		expect(body.cards.map((c) => c.choices)).toEqual([["誤1", "誤2"], []]);
+		expect([...body.pool].sort()).toEqual(["他の裏", "正"]);
+
+		const tooMany = await call("POST", `/api/decks/${deck.id}/cards`, { json: { front: "Q", back: "A", choices: ["1", "2", "3", "4", "5", "6"] } });
+		expect(tooMany.status).toBe(400);
+	});
+
 	it("表か裏が空なら 400", async () => {
 		const deck = await createDeck();
 		expect((await call("POST", `/api/decks/${deck.id}/cards`, { json: { front: "a", back: "" } })).status).toBe(400);
@@ -121,10 +149,28 @@ describe("札", () => {
 
 		const exp = await call("GET", `/api/decks/${deck.id}/cards/export`);
 		expect(exp.status).toBe(200);
-		expect(exp.body).toBe("表\t裏\t補足\tタグ\nOSI\t7階層\t\tモデル\nTCP\t伝送制御\t第4層\t\n");
+		expect(exp.body).toBe("表\t裏\t補足\tタグ\t選択肢\nOSI\t7階層\t\tモデル\t\nTCP\t伝送制御\t第4層\t\t\n");
+
+		const withChoices = await call("POST", `/api/decks/${deck.id}/cards/import`, { text: "問題文\\n2行目\t正解\t\t\t誤1|誤2\n" });
+		expect(withChoices.status).toBe(201);
+		const list = (await call("GET", `/api/decks/${deck.id}/cards?q=問題文`)).body as { cards: Json[] };
+		expect(list.cards[0]).toMatchObject({ front: "問題文\n2行目", back: "正解", choices: ["誤1", "誤2"] });
 
 		const empty = await call("POST", `/api/decks/${deck.id}/cards/import`, { text: "表だけ\n" });
 		expect(empty.status).toBe(400);
+	});
+
+	it("150 行の取り込みは batch の区切りをまたいでも行順を保つ", async () => {
+		// 本番の D1 は1文の値が 100 個までのため、複数行の INSERT はここでは再現できない。batch の分割だけを通す
+		const deck = await createDeck();
+		const rows = Array.from({ length: 150 }, (_, i) => `表${i}\t裏${i}\t\tt${i % 3}`).join("\n");
+		const imp = await call("POST", `/api/decks/${deck.id}/cards/import`, { text: `${rows}\n` });
+		expect(imp.status).toBe(201);
+		expect(imp.body).toEqual({ inserted: 150, skipped: 0 });
+		const list = (await call("GET", `/api/decks/${deck.id}/cards`)).body as { cards: { front: string }[] };
+		expect(list.cards).toHaveLength(150);
+		// 一覧は新しい順のため、取り込みの行順の逆になる
+		expect(list.cards.map((c) => c.front)).toEqual(Array.from({ length: 150 }, (_, i) => `表${149 - i}`));
 	});
 });
 
@@ -152,7 +198,7 @@ describe("学習", () => {
 		expect((s3.body as { cards: Json[] }).cards.map((c) => c["front"])).toEqual(["1", "2", "3"]);
 
 		const me = await call("GET", `/api/me?today=${TODAY}`);
-		expect(me.body).toMatchObject({ reviewedToday: 1 });
+		expect(me.body).toMatchObject({ reviewedToday: 1, streakDays: 1 });
 		const list = await call("GET", `/api/decks?today=2026-10-27`);
 		expect((list.body as { decks: Json[] }).decks[0]).toMatchObject({ total: 3, due: 1, fresh: 2 });
 	});

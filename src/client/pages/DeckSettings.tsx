@@ -3,10 +3,11 @@ import { useCallback, useState } from "react";
 import { api, useApi } from "../lib/api";
 import { useAutosave, saveStatusText } from "../lib/autosave";
 import { navigate } from "../lib/router";
+import type { DeckMode } from "../../lib/scheduler";
 import type { Deck } from "../lib/types";
 import { ConfirmDialog, ErrorState, InlineError, Link, PageHeader } from "../components/ui";
 
-type Draft = { name: string; newPerDay: string };
+type Draft = { name: string; newPerDay: string; mode: DeckMode };
 
 export function DeckSettings({ id }: { id: string }) {
 	const deck = useApi<{ deck: Deck }>(`/api/decks/${id}`);
@@ -20,14 +21,14 @@ export function DeckSettings({ id }: { id: string }) {
 }
 
 function Form({ deck }: { deck: Deck }) {
-	const [draft, setDraft] = useState<Draft>({ name: deck.name, newPerDay: String(deck.newPerDay) });
+	const [draft, setDraft] = useState<Draft>({ name: deck.name, newPerDay: String(deck.newPerDay), mode: deck.mode });
 	const [confirm, setConfirm] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const n = Number(draft.newPerDay);
 	const valid = draft.name.trim() !== "" && Number.isInteger(n) && n >= 0 && n <= 1000;
 
 	const save = useCallback(async (d: Draft) => {
-		await api(`/api/decks/${deck.id}`, { method: "PATCH", json: { name: d.name, newPerDay: Number(d.newPerDay) } });
+		await api(`/api/decks/${deck.id}`, { method: "PATCH", json: { name: d.name, newPerDay: Number(d.newPerDay), mode: d.mode } });
 	}, [deck.id]);
 	const auto = useAutosave(draft, save, { enabled: valid });
 
@@ -72,6 +73,14 @@ function Form({ deck }: { deck: Deck }) {
 							onBlur={() => void auto.flush()}
 							aria-invalid={!valid}
 						/>
+					</div>
+					<div className="field">
+						<label htmlFor="mode">出題の形式</label>
+						<p className="field__help">四択の誤答は、札に書いた選択肢か、同じ単語帳の他の札の裏から作ります。学習の画面でも切り替えられます。</p>
+						<select id="mode" value={draft.mode} onChange={(e) => setDraft({ ...draft, mode: e.target.value as DeckMode })} onBlur={() => void auto.flush()}>
+							<option value="recall">記述（答えを思い出して自己評価）</option>
+							<option value="choice">四択</option>
+						</select>
 					</div>
 					<InlineError message={auto.error} />
 				</form>

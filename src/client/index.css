@@ -68,6 +68,7 @@
   --text-md: 14px;    /* 業務画面の本文・入力欄・ボタン */
   --text-lg: 16px;    /* 節の見出し。一般利用者向けの本文 */
   --text-xl: 20px;    /* ページの見出し */
+  --text-2xl: 28px; /* たまの演出の文字 */
 
   --leading-tight: 1.25;  /* 見出し */
   --leading-normal: 1.5;  /* 本文 */
@@ -126,6 +127,7 @@
   /* ---------- 動き ---------- */
   --duration-fast: 120ms;   /* 色・背景の変化 */
   --duration-normal: 200ms; /* 引き出しの開閉 */
+  --duration-slow: 320ms;   /* 状態の変化の演出(弾む・浮かぶ) */
   --easing: cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -149,6 +151,7 @@
   --text-md: 16px;
   --text-lg: 18px;
   --text-xl: 22px;
+  --text-2xl: 30px; /* たまの演出の文字 */
   --row-h: 40px;
   --control-h-sm: 30px;
   --control-h-md: 36px;
@@ -237,7 +240,10 @@
   :root {
     --duration-fast: 0ms;
     --duration-normal: 0ms;
+    --duration-slow: 0ms;
   }
+  /* 紙吹雪とたまの演出は動きそのものが目的なので出さない */
+  .confetti, .cheer { display: none; }
 }
 }
 
@@ -324,6 +330,7 @@
 	}
 	.action-bar__status { margin-right: auto; font-size: var(--text-sm); color: var(--color-text-muted); }
 	.action-bar--grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+	.action-bar--grid-2 { grid-template-columns: repeat(2, 1fr); }
 	.action-bar--grid .btn { justify-content: center; height: var(--control-h-lg); }
 
 	/* ---------- ボタン ---------- */
@@ -355,6 +362,13 @@
 	.btn--danger:hover:not(:disabled) { color: var(--color-text-on-accent); background: var(--color-danger); }
 	.btn--sm { height: var(--control-h-sm); padding: 0 var(--space-2); font-size: var(--text-sm); }
 	.btn--icon { padding: 0; width: var(--control-h-md); justify-content: center; }
+
+	/* ---------- 2〜3択の切り替え(出題の形式など) ---------- */
+	.segmented { display: inline-flex; height: var(--control-h-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+	.segmented button { padding: 0 var(--space-3); font: inherit; font-size: var(--text-sm); color: var(--color-text-muted); background: transparent; border: 0; cursor: pointer; }
+	.segmented button + button { border-left: 1px solid var(--color-border); }
+	.segmented button[aria-checked="true"] { color: var(--color-text); background: var(--color-bg-subtle); font-weight: var(--weight-medium); }
+	.segmented button:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -2px; }
 	.icon { width: var(--icon-sm); height: var(--icon-sm); flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 	.icon--md { width: var(--icon-md); height: var(--icon-md); }
 
@@ -517,7 +531,133 @@
 	.study__back { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-lg); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
 	.study__note { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--color-text-muted); }
 	.study__meta { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; font-size: var(--text-sm); color: var(--color-text-muted); }
+	.study__hint { display: grid; gap: var(--space-1); padding: var(--space-3); color: var(--color-text-muted); background: var(--color-bg-subtle); border-radius: var(--radius-md); white-space: pre-wrap; overflow-wrap: anywhere; }
+	.study__hint-label { font-size: var(--text-xs); font-weight: var(--weight-medium); text-transform: none; }
+	.study__result { font-weight: var(--weight-bold); }
+	.study__result--correct { color: var(--color-success); }
+	.study__result--wrong { color: var(--color-danger); }
+
+	/* 四択の選択肢。押したあとは正解を緑、選んだ誤答を赤の面で示し、色だけに頼らずアイコンも添える */
+	.choices { display: grid; gap: var(--space-2); list-style: none; padding: 0; margin: 0; }
+	.choice {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		width: 100%;
+		min-height: var(--control-h-lg);
+		padding: var(--space-2) var(--space-3);
+		font: inherit;
+		text-align: left;
+		color: var(--color-text);
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		cursor: pointer;
+	}
+	.choice:hover:not(:disabled) { background: var(--color-bg-hover); }
+	.choice:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+	.choice:disabled { cursor: default; color: var(--color-text-muted); }
+	.choice__key { flex-shrink: 0; width: var(--icon-md); font-size: var(--text-sm); color: var(--color-text-muted); }
+	.choice__text { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
+	.choice[data-result="correct"] { color: var(--color-text); background: var(--color-success-subtle); border-color: var(--color-success); }
+	.choice[data-result="wrong"] { color: var(--color-text); background: var(--color-danger-subtle); border-color: var(--color-danger); }
 
 	/* ---------- ホーム ---------- */
 	.home-stats { display: flex; gap: var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+	/* ---------- 達成感の演出(2026-10-27 指示)。動くのは状態が変わった瞬間だけで、--duration-slow に収める ---------- */
+	/* 連続で学習した日数(上部のバー) */
+	.streak { display: inline-flex; align-items: center; gap: var(--space-1); margin-right: var(--space-3); color: var(--color-warning); font-weight: var(--weight-medium); }
+
+	/* 今日の進み具合。見出し行の下に細い棒 */
+	.progress { position: sticky; top: calc(var(--control-h-lg) + var(--header-h)); z-index: var(--z-sticky); height: 3px; background: var(--color-border); }
+	.progress__bar { display: block; height: 100%; background: var(--color-accent); transition: width var(--duration-slow) var(--easing); }
+
+	/* その場の連続正解。数が増えるたびに弾む */
+	.streak-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+		height: 22px;
+		padding: 0 var(--space-2);
+		font-size: var(--text-xs);
+		font-weight: var(--weight-medium);
+		border-radius: var(--radius-full);
+		color: var(--color-text-muted);
+		background: var(--color-bg-subtle);
+		white-space: nowrap;
+		margin-left: auto;
+		animation: pop var(--duration-slow) var(--easing);
+	}
+	.streak-badge[data-tone="accent"] { color: var(--color-accent); background: var(--color-accent-subtle); }
+	.streak-badge[data-tone="success"] { color: var(--color-success); background: var(--color-success-subtle); }
+	@keyframes pop {
+		0% { transform: scale(0.8); }
+		60% { transform: scale(1.15); }
+		100% { transform: scale(1); }
+	}
+
+	/* 札の入れ替わりと答えの表示は、下から短く浮かぶ */
+	.study__card { animation: rise var(--duration-slow) var(--easing); }
+	.study__answer { display: grid; gap: var(--space-5); animation: rise var(--duration-slow) var(--easing); }
+	@keyframes rise {
+		from { opacity: 0; transform: translateY(var(--space-2)); }
+		to { opacity: 1; transform: none; }
+	}
+
+	/* 四択: 正解は一度弾み、選んだ誤答は短く横に揺れる */
+	.choice[data-result="correct"] { animation: pop var(--duration-slow) var(--easing); }
+	.choice[data-result="wrong"] { animation: shake var(--duration-slow) var(--easing); }
+	@keyframes shake {
+		0%, 100% { transform: none; }
+		25% { transform: translateX(-4px); }
+		75% { transform: translateX(4px); }
+	}
+
+	/* 評価のボタン。下の段に「次はいつ出るか」 */
+	.btn--rate { flex-direction: column; gap: 0; line-height: var(--leading-tight); }
+	.btn--rate__next { font-size: var(--text-xs); font-weight: var(--weight-normal); opacity: 0.8; }
+
+	/* 学習の終わり。成績を 3 つ並べる */
+	.finished { position: relative; display: grid; justify-items: center; gap: var(--space-5); padding: var(--space-12) var(--space-page-x); text-align: center; overflow: hidden; animation: rise var(--duration-slow) var(--easing); }
+	.finished__icon { display: grid; place-items: center; width: 56px; height: 56px; color: var(--color-warning); background: var(--color-warning-subtle); border-radius: var(--radius-full); animation: pop var(--duration-slow) var(--easing); }
+	.finished__title { font-size: var(--text-lg); }
+	.finished__stats { display: grid; grid-auto-flow: column; gap: var(--space-8); margin: 0; }
+	.finished__stats div { display: grid; gap: var(--space-1); }
+	.finished__stats dt { font-size: var(--text-xs); color: var(--color-text-muted); }
+	.finished__stats dd { margin: 0; font-size: var(--text-xl); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
+
+	/* 正解のたまの演出。画面の中央に浮かんで 1.2 秒で消える。操作は遮らない */
+	.cheer { position: fixed; inset: 0; z-index: var(--z-toast); display: grid; place-items: center; pointer-events: none; }
+	.cheer__text {
+		padding: var(--space-3) var(--space-6);
+		font-size: var(--text-xl);
+		font-weight: var(--weight-bold);
+		color: var(--color-accent);
+		background: var(--color-bg);
+		border: 1px solid var(--color-accent);
+		border-radius: var(--radius-full);
+		box-shadow: var(--shadow-overlay);
+		animation: cheer 1200ms var(--easing) forwards;
+	}
+	.cheer[data-big] .cheer__text { color: var(--color-text-on-accent); background: var(--color-accent); font-size: var(--text-2xl); }
+	@keyframes cheer {
+		0% { opacity: 0; transform: scale(0.6); }
+		15% { opacity: 1; transform: scale(1.1); }
+		25% { transform: scale(1); }
+		75% { opacity: 1; transform: translateY(0); }
+		100% { opacity: 0; transform: translateY(calc(-1 * var(--space-6))); }
+	}
+
+	/* 紙吹雪。上から 1 秒で落ちて消える。色は accent / success / warning / danger の 4 色 */
+	.confetti { position: absolute; inset: 0; pointer-events: none; }
+	.confetti__piece { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; opacity: 0; animation: fall 1100ms var(--easing) forwards; }
+	.confetti__piece[data-hue="0"] { background: var(--color-accent); }
+	.confetti__piece[data-hue="1"] { background: var(--color-success); }
+	.confetti__piece[data-hue="2"] { background: var(--color-warning); }
+	.confetti__piece[data-hue="3"] { background: var(--color-danger); }
+	@keyframes fall {
+		0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+		100% { opacity: 0; transform: translateY(70vh) rotate(540deg); }
+	}
 }

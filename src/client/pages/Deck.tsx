@@ -8,14 +8,20 @@ import type { Card, Deck } from "../lib/types";
 import { setUi } from "../lib/ui-state";
 import { ConfirmDialog, EmptyState, ErrorState, Icon, InlineError, Link, PageHeader, SkeletonRows, StateBadge, Toast } from "../components/ui";
 
-type Draft = { front: string; back: string; note: string; tags: string };
+type Draft = { front: string; back: string; note: string; tags: string; choices: string };
 
 function toDraft(c: Card): Draft {
-	return { front: c.front, back: c.back, note: c.note, tags: c.tags.join(", ") };
+	return { front: c.front, back: c.back, note: c.note, tags: c.tags.join(", "), choices: c.choices.join("\n") };
 }
 
 function fromDraft(d: Draft) {
-	return { front: d.front, back: d.back, note: d.note, tags: d.tags.split(/[,、]/).map((s) => s.trim()).filter(Boolean) };
+	return {
+		front: d.front,
+		back: d.back,
+		note: d.note,
+		tags: d.tags.split(/[,、]/).map((s) => s.trim()).filter(Boolean),
+		choices: d.choices.split("\n").map((s) => s.trim()).filter(Boolean),
+	};
 }
 
 export function DeckPage({ id }: { id: string }) {
@@ -240,12 +246,17 @@ function DraftFields({ draft, setDraft, onBlur, idPrefix }: { draft: Draft; setD
 				<p className="field__help">読点かカンマで区切ります。</p>
 				<input id={`${idPrefix}-tags`} value={draft.tags} onChange={(e) => setDraft({ ...draft, tags: e.target.value })} onBlur={onBlur} placeholder="例）ネットワーク, 第4層" />
 			</div>
+			<div className="field">
+				<label htmlFor={`${idPrefix}-choices`}>四択の誤答</label>
+				<p className="field__help">1行に1つ、3つまで。空なら同じ単語帳の他の札の裏から作ります。</p>
+				<textarea id={`${idPrefix}-choices`} value={draft.choices} onChange={(e) => setDraft({ ...draft, choices: e.target.value })} onBlur={onBlur} rows={3} />
+			</div>
 		</>
 	);
 }
 
 function NewCard({ deckId, onCreated, onClose }: { deckId: string; onCreated: () => void; onClose: () => void }) {
-	const [draft, setDraft] = useState<Draft>({ front: "", back: "", note: "", tags: "" });
+	const [draft, setDraft] = useState<Draft>({ front: "", back: "", note: "", tags: "", choices: "" });
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -255,7 +266,7 @@ function NewCard({ deckId, onCreated, onClose }: { deckId: string; onCreated: ()
 		try {
 			await api(`/api/decks/${deckId}/cards`, { method: "POST", json: fromDraft(draft) });
 			// 続けて登録しやすいよう、表と裏だけ空にしてタグは残す
-			setDraft((d) => ({ ...d, front: "", back: "", note: "" }));
+			setDraft((d) => ({ ...d, front: "", back: "", note: "", choices: "" }));
 			onCreated();
 		} catch (e) {
 			setError(e instanceof Error ? e.message : String(e));

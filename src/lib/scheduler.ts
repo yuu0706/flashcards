@@ -9,6 +9,10 @@ export type Rating = (typeof RATINGS)[number];
 export const CARD_STATES = ["new", "learning", "review"] as const;
 export type CardState = (typeof CARD_STATES)[number];
 
+/** 出題の形式。recall は答えを思い出して自己評価、choice は四択 */
+export const DECK_MODES = ["recall", "choice"] as const;
+export type DeckMode = (typeof DECK_MODES)[number];
+
 export type Schedule = {
 	state: CardState;
 	/** 次に出す日(YYYY-MM-DD)。new の間は null */

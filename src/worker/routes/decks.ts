@@ -2,14 +2,19 @@ import { and, asc, count, eq, isNull, lte, or, sql } from "drizzle-orm";
 import { Hono, type Context } from "hono";
 
 import { cards, decks } from "../../db/schema";
-import { isDateString } from "../../lib/scheduler";
+import { DECK_MODES, isDateString, type DeckMode } from "../../lib/scheduler";
 import { requireContext } from "../context";
 import type { AppEnv } from "../env";
 import { int, jsonBody, str, ValidationError } from "../input";
 
 export const deckRoutes = new Hono<AppEnv>();
 
-const DECK_COLUMNS = { id: decks.id, name: decks.name, newPerDay: decks.newPerDay, createdAt: decks.createdAt, updatedAt: decks.updatedAt };
+const DECK_COLUMNS = { id: decks.id, name: decks.name, newPerDay: decks.newPerDay, mode: decks.mode, createdAt: decks.createdAt, updatedAt: decks.updatedAt };
+
+function modeParam(v: unknown): DeckMode {
+	if (typeof v === "string" && (DECK_MODES as readonly string[]).includes(v)) return v as DeckMode;
+	throw new ValidationError("出題の形式は recall か choice で指定してください");
+}
 
 function todayParam(c: Context<AppEnv>): string {
 	const today = c.req.query("today");
@@ -41,7 +46,8 @@ deckRoutes.post("/", async (c) => {
 	const body = await jsonBody(c.req.raw);
 	const name = str(body["name"], "単語帳の名前", { max: 100, required: true });
 	const newPerDay = int(body["newPerDay"], "1日の新しい札の数", { min: 0, max: 1000, fallback: 20 });
-	const inserted = await db.insert(decks).values({ userId: actor.id, name, newPerDay }).returning(DECK_COLUMNS);
+	const mode = "mode" in body ? modeParam(body["mode"]) : "recall";
+	const inserted = await db.insert(decks).values({ userId: actor.id, name, newPerDay, mode }).returning(DECK_COLUMNS);
 	return c.json({ deck: inserted[0] }, 201);
 });
 
@@ -66,9 +72,10 @@ deckRoutes.patch("/:id", async (c) => {
 	const deck = await ownDeck(c, c.req.param("id"));
 	if (!deck) return c.json({ error: "単語帳が見つかりません" }, 404);
 	const body = await jsonBody(c.req.raw);
-	const patch: Partial<{ name: string; newPerDay: number }> = {};
+	const patch: Partial<{ name: string; newPerDay: number; mode: DeckMode }> = {};
 	if ("name" in body) patch.name = str(body["name"], "単語帳の名前", { max: 100, required: true });
 	if ("newPerDay" in body) patch.newPerDay = int(body["newPerDay"], "1日の新しい札の数", { min: 0, max: 1000 });
+	if ("mode" in body) patch.mode = modeParam(body["mode"]);
 	const updated = await db
 		.update(decks)
 		.set({ ...patch, updatedAt: new Date().toISOString() })
@@ -92,6 +99,7 @@ const STUDY_COLUMNS = {
 	back: cards.back,
 	note: cards.note,
 	tags: cards.tags,
+	choices: cards.choices,
 	state: cards.state,
 	due: cards.due,
 	intervalDays: cards.intervalDays,
@@ -127,5 +135,17 @@ deckRoutes.get("/:id/study", async (c) => {
 					.limit(deck.newPerDay)
 			: [];
 
-	return c.json({ deck, cards: [...due, ...fresh] });
+	// 四択の誤答の候補。自前の選択肢が無い札は、同じ単語帳の他の札の裏から画面側で選ぶ。
+	// 全札の裏を返すと大きくなるため、無作為に 200 件まで(重複は除く)
+	const pool = (
+		await db
+			.select({ back: cards.back })
+			.from(cards)
+			.where(eq(cards.deckId, deck.id))
+			.groupBy(cards.back)
+			.orderBy(sql`random()`)
+			.limit(200)
+	).map((r) => r.back);
+
+	return c.json({ deck, cards: [...due, ...fresh], pool });
 });

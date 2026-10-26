@@ -24,7 +24,10 @@ npm run cf-typegen          # wrangler.json を変えたら Env の型を再生�
 - **`/api/*` は Cloudflare Access の JWT 検証を必須にする。** ヘッダーの存在だけで信用しない。ローカルのバイパス(`DEV_AUTH_EMAIL`)は localhost でしか効かない。
 - **画面の見た目は Skill `ui-design`、文言は `ui-text` に従う。** 色・余白・寸法は `src/client/index.css` のトークンだけを使う。自分用の道具なので `<html data-text="large">`。編集欄は自動保存で、保存のボタンを置かない。
 - **開閉の状態は `<html data-panel>` の1か所に集める**(狭い画面で一覧と詳細を切り替える)。
+- **四択の選択肢とヒントは `src/lib/quiz.ts` の純粋関数で、手元の札だけから作る。** AI は使わない。誤答は札の `choices` を優先し、足りない分を学習 API の `pool`(同じ単語帳の裏)から補う。
+- **達成感の演出(進み具合の棒・連続正解・たまに出る称賛・紙吹雪)は 2026-10-27 の利用者の指示で入れた。** `ui-design` の「飾りの動き」の禁止の例外で、動くのは状態が変わった瞬間だけ、長さは `--duration-slow` と紙吹雪の 1.1 秒まで、`prefers-reduced-motion` では出さない。出る確率と節目は `src/lib/quiz.ts` の `rollCheer`。
+- **本番の D1 は1つの SQL に結び付けられる値が 100 個まで。** 複数行をまとめた INSERT は使わず、1行ずつの文を `db.batch` でまとめる。手元の SQLite はこの制限を再現しない。
 
-## 未完了
+## 本番
 
-- `wrangler.json` の `database_id` と `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` は、Cloudflare 側の作成後に埋める(README「初回のデプロイ」)。
+個人の Cloudflare アカウント(`yuu0706.workers.dev`)に配置済み。`wrangler.json` の `database_id` は本番のもの。Access の `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` は Worker の secret で、リポジトリには置かない(公開リポジトリのため)。マイグレーションを足したら `npm run db:apply:remote` → `npm run deploy` の順(どちらも利用者が実行する)。

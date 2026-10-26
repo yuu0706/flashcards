@@ -2,7 +2,7 @@ import { useApi } from "./lib/api";
 import { match, useLocation } from "./lib/router";
 import { today } from "./lib/today";
 import type { Me } from "./lib/types";
-import { Link } from "./components/ui";
+import { Icon, Link } from "./components/ui";
 import { DeckPage } from "./pages/Deck";
 import { DeckSettings } from "./pages/DeckSettings";
 import { Home } from "./pages/Home";
@@ -42,6 +42,12 @@ export default function App() {
 				<span className="topbar__spacer" />
 				{me.data ? (
 					<span className="topbar__meta">
+						{me.data.streakDays > 0 ? (
+							<span className="streak" title={`${me.data.streakDays} 日連続で学習しています`}>
+								<Icon name="flame" />
+								{me.data.streakDays} 日連続
+							</span>
+						) : null}
 						今日 {me.data.reviewedToday} 回 ・ {me.data.email}
 					</span>
 				) : null}
