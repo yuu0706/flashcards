@@ -1,0 +1,6 @@
+# ローカル開発用。このファイルを .dev.vars にコピーして使う(.dev.vars は gitignore 済み)。
+#
+# ローカルでは Cloudflare Access を経由できないため、DEV_AUTH_EMAIL に書いたメールアドレスの
+# 利用者としてログイン済み扱いにする。接続先が localhost のときだけ効く(src/worker/auth.ts)。
+# 本番の vars / secret には設定しない。
+DEV_AUTH_EMAIL="you@example.com"

@@ -1,0 +1,31 @@
+# 依存
+node_modules/
+
+# ビルド成果物
+dist/
+.vite/
+
+# 秘密情報
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+!.env.example
+
+# Wrangler のローカル状態(ローカル D1 の SQLite が入る)
+.wrangler/
+.mf/
+*.sqlite
+*.sqlite3
+
+# ログ
+*.log
+
+# OS / エディタ
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code のローカル設定
+.claude/

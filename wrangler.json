@@ -1,0 +1,35 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "flashcards",
+	"main": "./src/worker/index.ts",
+	"compatibility_date": "2026-10-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"observability": { "enabled": true },
+	"upload_source_maps": true,
+	"assets": {
+		"directory": "./dist/client",
+		"not_found_handling": "single-page-application",
+		// アセット配信は Worker より先に評価され、見つからないパスは index.html に倒れる。
+		// /api/* を Worker に届けるために明示する
+		"run_worker_first": ["/api/*"]
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "flashcards",
+			// `wrangler d1 create flashcards` の出力の database_id に置き換える。
+			// ローカル開発とテストはこの値を使わない(ローカルの SQLite が作られる)
+			"database_id": "REPLACE_WITH_D1_DATABASE_ID",
+			"migrations_dir": "migrations"
+		}
+	],
+	// Cloudflare Access(Zero Trust)の設定。機密ではないので vars に置く。
+	//   ACCESS_TEAM_DOMAIN: Zero Trust のチームドメイン(例: example.cloudflareaccess.com)
+	//   ACCESS_AUD:         Access アプリケーションの Application Audience (AUD) タグ
+	// 空のままデプロイすると /api/* は 500 を返し、誰も通れない(安全側)。
+	// ローカル開発は .dev.vars の DEV_AUTH_EMAIL を使う(.dev.vars.example 参照)
+	"vars": {
+		"ACCESS_TEAM_DOMAIN": "",
+		"ACCESS_AUD": ""
+	}
+}
