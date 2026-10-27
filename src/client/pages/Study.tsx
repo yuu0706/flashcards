@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { buildChoices, buildHint, rollCheer } from "../../lib/quiz";
-import { schedule, type DeckMode, type Rating } from "../../lib/scheduler";
+import { buildChoices, buildHint, pickSide, rollCheer, sides, type Side } from "../../lib/quiz";
+import { schedule, type DeckDirection, type DeckMode, type Rating } from "../../lib/scheduler";
 import { api, useApi } from "../lib/api";
 import { today } from "../lib/today";
-import type { Deck, StudyCard } from "../lib/types";
+import type { Deck, StudyCard, StudyPool } from "../lib/types";
 import { Badge, ErrorState, Icon, InlineError, Link, PageHeader } from "../components/ui";
 
 type Session = {
@@ -13,6 +13,8 @@ type Session = {
 	done: number;
 	/** 最初の列の長さ。進み具合の分母 */
 	total: number;
+	/** 先頭の札をどちら向きで出すか。単語帳の向きが mixed のときは札が変わるたびに引き直す */
+	side: Side;
 	revealed: boolean;
 	hint: boolean;
 	picked: string | null;
@@ -23,6 +25,7 @@ type Session = {
 };
 
 const RATING_LABEL: Record<Rating, string> = { again: "忘れた", hard: "あやふや", good: "覚えた" };
+const DIRECTION_LABEL: Record<DeckDirection, string> = { forward: "表→裏", reverse: "裏→表", mixed: "混ぜる" };
 
 type Cheer = { key: number; text: string; big: boolean };
 const CHOICE_LABEL = ["ア", "イ", "ウ", "エ"] as const;
@@ -52,9 +55,10 @@ function buzz(pattern: number | number[]) {
 
 export function Study({ id }: { id: string }) {
 	const t = today();
-	const loaded = useApi<{ deck: Deck; cards: StudyCard[]; pool: string[] }>(`/api/decks/${id}/study?today=${t}`);
+	const loaded = useApi<{ deck: Deck; cards: StudyCard[]; pool: StudyPool }>(`/api/decks/${id}/study?today=${t}`);
 	const [session, setSession] = useState<Session | null>(null);
 	const [mode, setMode] = useState<DeckMode | null>(null);
+	const [direction, setDirection] = useState<DeckDirection | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [cheer, setCheer] = useState<Cheer | null>(null);
@@ -72,19 +76,26 @@ export function Study({ id }: { id: string }) {
 	useEffect(() => {
 		if (loaded.data && session === null) {
 			const cards = loaded.data.cards;
-			setSession({ queue: cards, done: 0, total: cards.length, revealed: false, hint: false, picked: null, correct: 0, streak: 0, bestStreak: 0 });
+			const dir = loaded.data.deck.direction;
+			setSession({ queue: cards, done: 0, total: cards.length, side: pickSide(dir), revealed: false, hint: false, picked: null, correct: 0, streak: 0, bestStreak: 0 });
 			setMode(loaded.data.deck.mode);
+			setDirection(dir);
 		}
 	}, [loaded.data, session]);
 
 	const current = session?.queue[0] ?? null;
+	const side = session?.side ?? "forward";
+	// 向きに応じた問いと答え。裏→表では裏(説明)を見せて表(用語)を答える
+	const { question, answer } = current ? sides(current, side) : { question: "", answer: "" };
 
-	// 四択の選択肢。札が変わるたびに作り直す(同じ札が戻ってきたときも並びを変える)
+	// 四択の選択肢。札が変わるたびに作り直す(同じ札が戻ってきたときも並びを変える)。
+	// 札に書いた誤答は裏の言い換えなので、裏を答える向きでだけ使う
 	const choices = useMemo(() => {
 		if (!current || mode !== "choice" || !loaded.data) return null;
-		return buildChoices(current, loaded.data.pool);
-	}, [current, mode, loaded.data]);
-	const hint = useMemo(() => (current ? buildHint(current) : ""), [current]);
+		const pool = loaded.data.pool;
+		return side === "forward" ? buildChoices(current.back, current.choices, pool.backs) : buildChoices(current.front, [], pool.fronts);
+	}, [current, side, mode, loaded.data]);
+	const hint = useMemo(() => (current ? buildHint(answer, current.note) : ""), [current, answer]);
 
 	const reveal = useCallback(() => setSession((s) => (s ? { ...s, revealed: true } : s)), []);
 	const showHint = useCallback(() => setSession((s) => (s ? { ...s, hint: true } : s)), []);
@@ -92,7 +103,8 @@ export function Study({ id }: { id: string }) {
 		(choice: string) => {
 			setSession((s) => {
 				if (!s || s.revealed) return s;
-				const ok = choice === s.queue[0]?.back;
+				const card = s.queue[0];
+				const ok = card !== undefined && choice === sides(card, s.side).answer;
 				buzz(ok ? 30 : [60, 40, 60]);
 				return { ...s, revealed: true, picked: choice };
 			});
@@ -102,7 +114,7 @@ export function Study({ id }: { id: string }) {
 
 	const rate = useCallback(
 		async (rating: Rating) => {
-			if (!current || busy) return;
+			if (!current || busy || !direction) return;
 			setBusy(true);
 			setError(null);
 			try {
@@ -126,6 +138,7 @@ export function Study({ id }: { id: string }) {
 						...s,
 						queue,
 						done: s.done + 1,
+						side: pickSide(direction),
 						revealed: false,
 						hint: false,
 						picked: null,
@@ -140,7 +153,7 @@ export function Study({ id }: { id: string }) {
 				setBusy(false);
 			}
 		},
-		[current, busy, t],
+		[current, busy, t, direction],
 	);
 
 	// 出題の形式の切り替えは単語帳に保存する(スマホと PC で同じ形式になる)
@@ -155,7 +168,19 @@ export function Study({ id }: { id: string }) {
 		}
 	}
 
-	const correct = session?.picked !== null && session?.picked === current?.back;
+	// 出題の向きの切り替えも単語帳に保存する。今の札から新しい向きで出し直す
+	async function switchDirection(next: DeckDirection) {
+		if (next === direction) return;
+		setDirection(next);
+		setSession((s) => (s ? { ...s, side: pickSide(next), revealed: false, hint: false, picked: null } : s));
+		try {
+			await api(`/api/decks/${id}`, { method: "PATCH", json: { direction: next } });
+		} catch (e) {
+			setError(e instanceof Error ? e.message : String(e));
+		}
+	}
+
+	const correct = session?.picked !== null && session?.picked === answer;
 
 	// キーボード: 記述は Space で答え、H でヒント、1/2/3 で評価。四択は 1〜4 で選び、正解なら 2/3、不正解なら Enter で次へ
 	useEffect(() => {
@@ -201,26 +226,34 @@ export function Study({ id }: { id: string }) {
 					) : null
 				}
 				actions={
-					<>
-						{mode ? (
-							<div className="segmented" role="radiogroup" aria-label="出題の形式">
-								<button type="button" role="radio" aria-checked={mode === "recall"} onClick={() => void switchMode("recall")}>
-									記述
-								</button>
-								<button type="button" role="radio" aria-checked={mode === "choice"} onClick={() => void switchMode("choice")}>
-									四択
-								</button>
-							</div>
-						) : null}
-						<Link to={`/decks/${id}`} className="btn btn--secondary btn--icon" ariaLabel="学習をやめて札の一覧に戻る">
-							<Icon name="x" />
-						</Link>
-					</>
+					<Link to={`/decks/${id}`} className="btn btn--secondary btn--icon" ariaLabel="学習をやめて札の一覧に戻る">
+						<Icon name="x" />
+					</Link>
 				}
 			/>
 			{session ? (
 				<div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} aria-label="今日の進み具合">
 					<span className="progress__bar" style={{ width: `${progress * 100}%` }} />
+				</div>
+			) : null}
+			{/* 出題の形式と向きの切り替え。見出し行は高さが固定なので、折り返せる段を別に置く */}
+			{session && current && mode && direction ? (
+				<div className="study__toolbar">
+					<div className="segmented" role="radiogroup" aria-label="出題の形式">
+						<button type="button" role="radio" aria-checked={mode === "recall"} onClick={() => void switchMode("recall")}>
+							記述
+						</button>
+						<button type="button" role="radio" aria-checked={mode === "choice"} onClick={() => void switchMode("choice")}>
+							四択
+						</button>
+					</div>
+					<div className="segmented" role="radiogroup" aria-label="出題の向き">
+						{(Object.keys(DIRECTION_LABEL) as DeckDirection[]).map((d) => (
+							<button key={d} type="button" role="radio" aria-checked={direction === d} onClick={() => void switchDirection(d)}>
+								{DIRECTION_LABEL[d]}
+							</button>
+						))}
+					</div>
 				</div>
 			) : null}
 			{cheer ? (
@@ -245,6 +278,7 @@ export function Study({ id }: { id: string }) {
 								<Badge tone={current.state === "new" ? "neutral" : current.state === "learning" ? "danger" : "success"}>
 									{current.state === "new" ? "未学習" : current.state === "learning" ? "覚え直し" : `${current.intervalDays} 日ぶり`}
 								</Badge>
+								{side === "reverse" ? <Badge tone="accent">裏から出題</Badge> : null}
 								{current.tags.map((tag) => (
 									<Badge key={tag} tone="neutral">
 										{tag}
@@ -257,11 +291,11 @@ export function Study({ id }: { id: string }) {
 									</span>
 								) : null}
 							</div>
-							<p className="study__front">{current.front}</p>
+							<p className="study__front">{question}</p>
 							{choices ? (
 								<ol className="choices" aria-label="選択肢">
 									{choices.map((choice, i) => {
-										const result = !session.revealed ? undefined : choice === current.back ? "correct" : choice === session.picked ? "wrong" : "other";
+										const result = !session.revealed ? undefined : choice === answer ? "correct" : choice === session.picked ? "wrong" : "other";
 										return (
 											<li key={choice}>
 												<button type="button" className="choice" data-result={result} disabled={session.revealed} onClick={() => pick(choice)}>
@@ -290,7 +324,7 @@ export function Study({ id }: { id: string }) {
 										</p>
 									) : null}
 									{/* 四択では正解の選択肢が緑の面で見えているため、裏を重ねて出さない */}
-									{choices ? null : <p className="study__back">{current.back}</p>}
+									{choices ? null : <p className="study__back">{answer}</p>}
 									{current.note ? <p className="study__note">{current.note}</p> : null}
 								</div>
 							) : null}

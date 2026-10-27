@@ -540,6 +540,7 @@
 	/* 四択の選択肢。押したあとは正解を緑、選んだ誤答を赤の面で示し、色だけに頼らずアイコンも添える */
 	.choices { display: grid; gap: var(--space-2); list-style: none; padding: 0; margin: 0; }
 	.choice {
+	.study__toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-page-x) 0; }
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);

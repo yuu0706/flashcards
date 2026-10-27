@@ -5,7 +5,7 @@
 import { sql } from "drizzle-orm";
 import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-import { CARD_STATES, DECK_MODES, RATINGS } from "../lib/scheduler";
+import { CARD_STATES, DECK_DIRECTIONS, DECK_MODES, RATINGS } from "../lib/scheduler";
 
 const isoTimestampDefault = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
 const idDefault = sql`(lower(hex(randomblob(16))))`;
@@ -26,6 +26,7 @@ export const decks = sqliteTable(
 		name: text("name").notNull(),
 		newPerDay: integer("new_per_day").notNull().default(20),
 		mode: text("mode", { enum: DECK_MODES }).notNull().default("recall"),
+		direction: text("direction", { enum: DECK_DIRECTIONS }).notNull().default("forward"),
 		createdAt: text("created_at").notNull().default(isoTimestampDefault),
 		updatedAt: text("updated_at").notNull().default(isoTimestampDefault),
 	},

@@ -13,6 +13,10 @@ export type CardState = (typeof CARD_STATES)[number];
 export const DECK_MODES = ["recall", "choice"] as const;
 export type DeckMode = (typeof DECK_MODES)[number];
 
+/** 出題の向き。forward は表を見て裏を答える、reverse は裏を見て表を答える、mixed は札ごとに無作為 */
+export const DECK_DIRECTIONS = ["forward", "reverse", "mixed"] as const;
+export type DeckDirection = (typeof DECK_DIRECTIONS)[number];
+
 export type Schedule = {
 	state: CardState;
 	/** 次に出す日(YYYY-MM-DD)。new の間は null */

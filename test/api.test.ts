@@ -95,6 +95,16 @@ describe("単語帳の出題の形式", () => {
 		expect(changed.body).toMatchObject({ deck: { mode: "choice" } });
 		expect((await call("PATCH", `/api/decks/${deck.id}`, { json: { mode: "quiz" } })).status).toBe(400);
 	});
+
+	it("出題の向きの既定は forward。PATCH で reverse / mixed に変えられ、不正な値は 400", async () => {
+		const deck = await createDeck();
+		expect((await call("GET", `/api/decks/${deck.id}`)).body).toMatchObject({ deck: { direction: "forward" } });
+		const changed = await call("PATCH", `/api/decks/${deck.id}`, { json: { direction: "reverse" } });
+		expect(changed.status).toBe(200);
+		expect(changed.body).toMatchObject({ deck: { direction: "reverse" } });
+		expect((await call("PATCH", `/api/decks/${deck.id}`, { json: { direction: "mixed" } })).body).toMatchObject({ deck: { direction: "mixed" } });
+		expect((await call("PATCH", `/api/decks/${deck.id}`, { json: { direction: "upside" } })).status).toBe(400);
+	});
 });
 
 describe("札", () => {
@@ -118,7 +128,7 @@ describe("札", () => {
 		expect((await call("GET", `/api/decks/${deck.id}/cards`)).body).toMatchObject({ cards: [{ front: "UDP" }] });
 	});
 
-	it("四択の誤答を札に持て、学習の応答には同じ単語帳の裏の候補が付く", async () => {
+	it("四択の誤答を札に持て、学習の応答には同じ単語帳の裏と表の候補が付く", async () => {
 		const deck = await createDeck();
 		const made = await call("POST", `/api/decks/${deck.id}/cards`, { json: { front: "Q", back: "正", choices: ["誤1", "誤2", "誤1", ""] } });
 		expect(made.status).toBe(201);
@@ -127,9 +137,10 @@ describe("札", () => {
 
 		const study = await call("GET", `/api/decks/${deck.id}/study?today=${TODAY}`);
 		expect(study.status).toBe(200);
-		const body = study.body as { cards: { choices: string[] }[]; pool: string[] };
+		const body = study.body as { cards: { choices: string[] }[]; pool: { backs: string[]; fronts: string[] } };
 		expect(body.cards.map((c) => c.choices)).toEqual([["誤1", "誤2"], []]);
-		expect([...body.pool].sort()).toEqual(["他の裏", "正"]);
+		expect([...body.pool.backs].sort()).toEqual(["他の裏", "正"]);
+		expect([...body.pool.fronts].sort()).toEqual(["Q", "Q2"]);
 
 		const tooMany = await call("POST", `/api/decks/${deck.id}/cards`, { json: { front: "Q", back: "A", choices: ["1", "2", "3", "4", "5", "6"] } });
 		expect(tooMany.status).toBe(400);

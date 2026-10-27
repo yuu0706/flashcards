@@ -3,11 +3,11 @@ import { useCallback, useState } from "react";
 import { api, useApi } from "../lib/api";
 import { useAutosave, saveStatusText } from "../lib/autosave";
 import { navigate } from "../lib/router";
-import type { DeckMode } from "../../lib/scheduler";
+import type { DeckDirection, DeckMode } from "../../lib/scheduler";
 import type { Deck } from "../lib/types";
 import { ConfirmDialog, ErrorState, InlineError, Link, PageHeader } from "../components/ui";
 
-type Draft = { name: string; newPerDay: string; mode: DeckMode };
+type Draft = { name: string; newPerDay: string; mode: DeckMode; direction: DeckDirection };
 
 export function DeckSettings({ id }: { id: string }) {
 	const deck = useApi<{ deck: Deck }>(`/api/decks/${id}`);
@@ -21,14 +21,14 @@ export function DeckSettings({ id }: { id: string }) {
 }
 
 function Form({ deck }: { deck: Deck }) {
-	const [draft, setDraft] = useState<Draft>({ name: deck.name, newPerDay: String(deck.newPerDay), mode: deck.mode });
+	const [draft, setDraft] = useState<Draft>({ name: deck.name, newPerDay: String(deck.newPerDay), mode: deck.mode, direction: deck.direction });
 	const [confirm, setConfirm] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const n = Number(draft.newPerDay);
 	const valid = draft.name.trim() !== "" && Number.isInteger(n) && n >= 0 && n <= 1000;
 
 	const save = useCallback(async (d: Draft) => {
-		await api(`/api/decks/${deck.id}`, { method: "PATCH", json: { name: d.name, newPerDay: Number(d.newPerDay), mode: d.mode } });
+		await api(`/api/decks/${deck.id}`, { method: "PATCH", json: { name: d.name, newPerDay: Number(d.newPerDay), mode: d.mode, direction: d.direction } });
 	}, [deck.id]);
 	const auto = useAutosave(draft, save, { enabled: valid });
 
@@ -80,6 +80,15 @@ function Form({ deck }: { deck: Deck }) {
 						<select id="mode" value={draft.mode} onChange={(e) => setDraft({ ...draft, mode: e.target.value as DeckMode })} onBlur={() => void auto.flush()}>
 							<option value="recall">記述（答えを思い出して自己評価）</option>
 							<option value="choice">四択</option>
+						</select>
+					</div>
+					<div className="field">
+						<label htmlFor="direction">出題の向き</label>
+						<p className="field__help">「裏→表」は裏の説明を見て表の用語を答えます。「混ぜる」は札ごとにどちらかを出します。学習の画面でも切り替えられます。</p>
+						<select id="direction" value={draft.direction} onChange={(e) => setDraft({ ...draft, direction: e.target.value as DeckDirection })} onBlur={() => void auto.flush()}>
+							<option value="forward">表→裏（表を見て裏を答える）</option>
+							<option value="reverse">裏→表（裏を見て表を答える）</option>
+							<option value="mixed">混ぜる（札ごとにどちらか）</option>
 						</select>
 					</div>
 					<InlineError message={auto.error} />
