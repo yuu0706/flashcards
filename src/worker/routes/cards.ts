@@ -29,7 +29,7 @@ const CARD_COLUMNS = {
 	updatedAt: cards.updatedAt,
 };
 
-const LIMITS = { front: 2000, back: 4000, note: 4000, tag: 50, tags: 20, choice: 500, choices: 5, importRows: 2000 };
+const LIMITS = { front: 2000, back: 4000, note: 4000, tag: 50, tags: 20, choice: 500, choices: 5, importRows: 2000, importBytes: 4 * 1024 * 1024 };
 
 type Ctx = Context<AppEnv>;
 
@@ -108,7 +108,11 @@ cardRoutes.post("/decks/:deckId/cards/import", async (c) => {
 	const { actor, db } = requireContext(c);
 	const deckId = await ownDeckId(c, c.req.param("deckId"));
 	if (!deckId) return c.json({ error: "単語帳が見つかりません" }, 404);
+	// 行数の上限より先に本文の大きさで止める(巨大な本文を全部読んで分解しない)
+	const declared = Number(c.req.header("Content-Length") ?? 0);
+	if (declared > LIMITS.importBytes) throw new ValidationError("一度に取り込めるのは 4 MB までです");
 	const text = await c.req.text();
+	if (new TextEncoder().encode(text).length > LIMITS.importBytes) throw new ValidationError("一度に取り込めるのは 4 MB までです");
 	const { cards: parsed, skipped } = parseTsv(text);
 	if (parsed.length === 0) throw new ValidationError("取り込める行がありません。1列目に表、2列目に裏をタブ区切りで入れてください");
 	if (parsed.length > LIMITS.importRows) throw new ValidationError(`一度に取り込めるのは${LIMITS.importRows}行までです`);

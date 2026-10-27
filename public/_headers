@@ -1,0 +1,10 @@
+# 画面の HTML と静的ファイルに付ける防御のヘッダー(Workers の静的アセットが読む)。
+# API の応答のヘッダーは src/worker/index.ts の secureHeaders で付ける。
+# スクリプトは同一オリジンだけ。style の 'unsafe-inline' は React の style 属性(進み具合の棒と紙吹雪の位置)のため
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin

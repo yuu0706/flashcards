@@ -1,13 +1,20 @@
 import { Hono } from "hono";
+import { secureHeaders } from "hono/secure-headers";
 
 import { auth } from "./auth";
 import type { AppEnv } from "./env";
 import { ValidationError } from "./input";
+import { sameOriginOnly } from "./origin";
 import { cardRoutes } from "./routes/cards";
 import { deckRoutes } from "./routes/decks";
 import { meRoutes } from "./routes/me";
 
 const app = new Hono<AppEnv>();
+
+// API の応答にも防御のヘッダーを付ける(画面の HTML と静的ファイルは public/_headers で付ける)
+app.use("/api/*", secureHeaders({ crossOriginResourcePolicy: "same-origin", referrerPolicy: "no-referrer" }));
+// 他のサイトからの POST / PATCH / DELETE を拒む(CSRF)。認証より先に見て、Cookie の検証を無駄にしない
+app.use("/api/*", sameOriginOnly());
 
 // 認証不要: 稼働確認
 app.get("/api/health", (c) => c.json({ ok: true }));

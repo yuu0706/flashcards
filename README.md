@@ -15,6 +15,15 @@
 - 間隔反復（SM-2 相当）で出題する。答えを見て「忘れた / あやふや / 覚えた」を押すと、次に出る日が伸び縮みする。
 - 1日に新しく出す札の数を単語帳ごとに決める（既定 20）。
 
+## 安全のための作り
+
+- `/api/*` は Cloudflare Access の JWT を Worker で検証する（署名・`aud`・`iss`・`alg`）。ヘッダーの有無では信用しない。
+- 状態を変える API（POST / PATCH / DELETE）は、`Origin` か `Sec-Fetch-Site` が他のサイトなら 403 にする（CSRF 対策）。
+- 画面と静的ファイルには `public/_headers` で CSP（スクリプトは同一オリジンだけ）などの防御のヘッダーを付け、API の応答には Hono の `secureHeaders` を付ける。
+- 画面に出すメールアドレスは `y***@e***.com` の形に伏せる。
+- TSV の取り込みは 4 MB・2000 行まで。
+- Access 側の設定として、アプリの Cookie の SameSite を `Lax` 以上にしておく（Zero Trust の Access アプリケーションの設定）。
+
 ## 技術スタック
 
 | 役割 | 使うもの |

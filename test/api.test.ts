@@ -234,3 +234,35 @@ describe("学習", () => {
 		expect((reset.body as { card: Json }).card).toMatchObject({ state: "new", due: null, reps: 0, ease: 2.5 });
 	});
 });
+
+describe("他のサイトからの要求(CSRF)", () => {
+	async function post(headers: Record<string, string>) {
+		return SELF.fetch(`${HOST}/api/decks`, { method: "POST", headers: { "Content-Type": "text/plain", ...headers }, body: "x" });
+	}
+	it("Origin が別のサイトなら 403。同じオリジンとヘッダー無しは通す", async () => {
+		expect((await post({ Origin: "https://evil.example" })).status).toBe(403);
+		expect((await post({ Origin: "null" })).status).toBe(403);
+		expect((await post({ "Sec-Fetch-Site": "cross-site" })).status).toBe(403);
+		// 同じオリジンと、ヘッダーを付けないクライアントは認証と入力検証まで進む(本文が JSON でないため 400)
+		expect((await post({ Origin: HOST, "Sec-Fetch-Site": "same-origin" })).status).toBe(400);
+		expect((await post({})).status).toBe(400);
+	});
+	it("GET は Origin が別でも拒まない", async () => {
+		const res = await SELF.fetch(`${HOST}/api/decks?today=${TODAY}`, { headers: { Origin: "https://evil.example" } });
+		expect(res.status).toBe(200);
+	});
+	it("API の応答に防御のヘッダーが付く", async () => {
+		const res = await SELF.fetch(`${HOST}/api/health`);
+		expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+		expect(res.headers.get("Referrer-Policy")).toBe("no-referrer");
+	});
+	it("取り込みの本文は 4 MB まで", async () => {
+		const deck = await createDeck();
+		const res = await SELF.fetch(`${HOST}/api/decks/${deck.id}/cards/import`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain", "Content-Length": String(5 * 1024 * 1024) },
+			body: "a\tb",
+		});
+		expect(res.status).toBe(400);
+	});
+});

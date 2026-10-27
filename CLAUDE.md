@@ -22,6 +22,8 @@ npm run cf-typegen          # wrangler.json を変えたら Env の型を再生�
 - **間隔反復の計算は `src/lib/scheduler.ts` の純粋関数だけで行う。** DB や日時に依存させず、`test/scheduler.test.ts` で固定する。
 - **すべてのクエリは `user_id` で絞る。** 他人の単語帳・札は 404 にする(`test/isolation.test.ts`)。
 - **`/api/*` は Cloudflare Access の JWT 検証を必須にする。** ヘッダーの存在だけで信用しない。ローカルのバイパス(`DEV_AUTH_EMAIL`)は localhost でしか効かない。
+- **状態を変える `/api/*` は同一オリジンからだけ受ける**(`src/worker/origin.ts`。Origin / Sec-Fetch-Site が他サイトなら 403)。防御のヘッダーは画面側が `public/_headers`、API 側が `secureHeaders`。CSP は `script-src 'self'` なので、外部のスクリプトや CDN を足さない。
+- **画面にメールアドレスをそのまま出さない。** 肩越しの覗き見を避けるため `src/lib/mask.ts` の `maskEmail` で伏せる。
 - **画面の見た目は Skill `ui-design`、文言は `ui-text` に従う。** 色・余白・寸法は `src/client/index.css` のトークンだけを使う。自分用の道具なので `<html data-text="large">`。編集欄は自動保存で、保存のボタンを置かない。
 - **開閉の状態は `<html data-panel>` の1か所に集める**(狭い画面で一覧と詳細を切り替える)。
 - **四択の選択肢とヒントは `src/lib/quiz.ts` の純粋関数で、手元の札だけから作る。** AI は使わない。誤答は札の `choices` を優先し、足りない分を学習 API の `pool.backs`(同じ単語帳の裏)から補う。出題の向き(`decks.direction`: forward / reverse / mixed)が裏→表のときは `choices` を使わず `pool.fronts` だけから作る。向きは札ごとに `pickSide` で決め、札の間隔反復の状態は向きに関係なく 1 つ。
