@@ -5,6 +5,7 @@ import type { Me } from "./lib/types";
 import { Icon, Link } from "./components/ui";
 import { DeckPage } from "./pages/Deck";
 import { DeckSettings } from "./pages/DeckSettings";
+import { HelpPage } from "./pages/Help";
 import { Home } from "./pages/Home";
 import { ImportPage } from "./pages/Import";
 import { Study } from "./pages/Study";
@@ -13,6 +14,7 @@ import { EmptyState, ErrorState } from "./components/ui";
 function Routes({ path }: { path: string }) {
 	let p: Record<string, string> | null;
 	if (path === "/") return <Home />;
+	if (path === "/help/tsv") return <HelpPage />;
 	if ((p = match("/decks/:id", path))) return <DeckPage id={p["id"]!} />;
 	if ((p = match("/decks/:id/study", path))) return <Study id={p["id"]!} />;
 	if ((p = match("/decks/:id/import", path))) return <ImportPage id={p["id"]!} />;

@@ -52,7 +52,9 @@ export function ImportPage({ id }: { id: string }) {
 					<form className="form" onSubmit={(e) => e.preventDefault()}>
 						<div className="field">
 							<label htmlFor="tsv">スプレッドシートからコピーした行</label>
-							<p className="field__help">列の順は「表、裏、補足、タグ」です。補足とタグは省けます。タグは読点かカンマで区切ります。</p>
+							<p className="field__help">
+								列の順は「表、裏、補足、タグ、選択肢」です。補足とタグと選択肢は省けます。<Link to="/help/tsv">TSV の形式と見本</Link>を確認してください。
+							</p>
 							<textarea
 								id="tsv"
 								className="textarea--tall"

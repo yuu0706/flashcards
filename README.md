@@ -87,6 +87,7 @@ DNSSEC が提供するものはどれか。	応答の完全性と真正性	暗�
 - タグは読点（、）かカンマで区切る。
 - 選択肢は四択の誤答で、`|` で区切る（3つまで使う）。空なら同じ単語帳の他の札の裏から作る。
 - セルの中の改行は `\n` の2文字で表す。書き出しでも同じ形になる。
+- 画面の「TSV の形式」（`/help/tsv`）に同じ説明と見本（`public/help/sample.tsv`）があり、AI に札を作らせるための Claude 用スキル（`public/help/flashcards-tsv/SKILL.md`）と依頼文を配布している。形式を変えたら 3 か所（`src/lib/tsv.ts`、`/help/tsv` の画面、SKILL.md）をそろえる。
 - `samples/` に情報処理安全確保支援士向けの見本がある。用語 `sc-terms.tsv`（76 枚）、文章問題と四択は `sc-questions.tsv`（21 問、基礎）、`sc-questions-tech.tsv`（48 問、暗号・認証・ネットワーク・Web・攻撃・対策・メール）、`sc-questions-ops.tsv`（42 問、インシデント対応・マネジメント・法規）。
 
 ## ディレクトリ

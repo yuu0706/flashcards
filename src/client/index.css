@@ -314,6 +314,16 @@
 
 	.page-body { padding: var(--space-page-y) var(--space-page-x); display: grid; gap: var(--space-section); }
 
+	/* 案内のページ(TSV の形式)。本文は読み物なので幅を抑える */
+	.help { max-width: 72ch; }
+	.help h2 { font-size: var(--text-lg); font-weight: var(--weight-bold); }
+	/* 一覧の表と違い読み物なので、行の高さを固定せず内容を折り返す */
+	.help .table td { height: auto; padding: var(--space-2) var(--space-3); vertical-align: top; white-space: normal; }
+	.help .table th { white-space: normal; }
+	.help__list { display: grid; gap: var(--space-1); padding-left: var(--space-5); font-size: var(--text-sm); color: var(--color-text-muted); }
+	.help code { font-family: var(--font-mono); font-size: 0.95em; padding: 0 var(--space-1); background: var(--color-bg-subtle); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+	.codeblock { margin: 0; padding: var(--space-3); font-family: var(--font-mono); font-size: var(--text-sm); line-height: var(--leading-normal); background: var(--color-bg-subtle); border: 1px solid var(--color-border); border-radius: var(--radius-md); white-space: pre-wrap; overflow-wrap: anywhere; }
+
 	/* ---------- 画面下に固定する操作バー ---------- */
 	.action-bar {
 		position: sticky;
@@ -530,6 +540,7 @@
 	.study__front { font-size: var(--text-xl); font-weight: var(--weight-bold); line-height: var(--leading-tight); white-space: pre-wrap; overflow-wrap: anywhere; }
 	.study__back { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-lg); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
 	.study__note { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--color-text-muted); }
+	.study__toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-page-x) 0; }
 	.study__meta { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; font-size: var(--text-sm); color: var(--color-text-muted); }
 	.study__hint { display: grid; gap: var(--space-1); padding: var(--space-3); color: var(--color-text-muted); background: var(--color-bg-subtle); border-radius: var(--radius-md); white-space: pre-wrap; overflow-wrap: anywhere; }
 	.study__hint-label { font-size: var(--text-xs); font-weight: var(--weight-medium); text-transform: none; }
@@ -540,7 +551,6 @@
 	/* 四択の選択肢。押したあとは正解を緑、選んだ誤答を赤の面で示し、色だけに頼らずアイコンも添える */
 	.choices { display: grid; gap: var(--space-2); list-style: none; padding: 0; margin: 0; }
 	.choice {
-	.study__toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-page-x) 0; }
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
