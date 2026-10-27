@@ -1,3 +1,4 @@
+import { maskEmail } from "../lib/mask";
 import { useApi } from "./lib/api";
 import { match, useLocation } from "./lib/router";
 import { today } from "./lib/today";
@@ -50,7 +51,8 @@ export default function App() {
 								{me.data.streakDays} 日連続
 							</span>
 						) : null}
-						今日 {me.data.reviewedToday} 回 ・ {me.data.email}
+						今日 {me.data.reviewedToday} 回 ・ {/* 肩越しに覗かれても読めないよう伏せる */}
+						<span aria-label="ログイン中のアカウント">{maskEmail(me.data.email)}</span>
 					</span>
 				) : null}
 			</div>
