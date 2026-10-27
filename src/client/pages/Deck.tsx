@@ -43,11 +43,13 @@ export function DeckPage({ id }: { id: string }) {
 	// 取り込みの画面から戻ってきたときの通知。URL に残さない
 	const { query } = useLocation();
 	const imported = query.get("imported");
+	const updated = query.get("updated");
 	useEffect(() => {
 		if (imported === null) return;
-		setToast(`${imported} 件の札を取り込みました`);
+		const n = Number(updated ?? 0);
+		setToast(n > 0 ? `${imported} 件の札を取り込み、同じ表の ${n} 件を書き換えました` : `${imported} 件の札を取り込みました`);
 		navigate(`/decks/${id}`, { replace: true });
-	}, [imported, id]);
+	}, [imported, updated, id]);
 
 	// 狭い画面で詳細だけを出すかどうかは <html data-panel> の1か所で決める
 	const panelOpen = creating || selectedId !== null;

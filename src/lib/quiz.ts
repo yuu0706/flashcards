@@ -33,20 +33,60 @@ export function sides(card: { front: string; back: string }, side: Side): { ques
 	return side === "forward" ? { question: card.front, answer: card.back } : { question: card.back, answer: card.front };
 }
 
+/** 他の札から誤答を選ぶとき、正解に似た候補をこの数だけ残してから無作為に選ぶ */
+const NEAR_POOL = 4;
+/** 語尾の一致を見る最大の文字数 */
+const SUFFIX_MAX = 4;
+
+/** 末尾から数えて何文字が一致するか(「〜プロトコル」「〜攻撃」のような語尾の型をそろえるため) */
+export function commonSuffix(a: string, b: string, max = SUFFIX_MAX): number {
+	const x = [...a];
+	const y = [...b];
+	let n = 0;
+	while (n < max && n < x.length && n < y.length && x[x.length - 1 - n] === y[y.length - 1 - n]) n++;
+	return n;
+}
+
+/**
+ * 正解にどれだけ似ているか(小さいほど似ている)。
+ * 語尾が同じ候補を強く優先し、同じ語尾の中では長さの近い候補を優先する。
+ * 正解だけが「〜プロトコル」で終わる、正解だけが長い、といった見た目の手掛かりを消すため
+ */
+export function similarity(answer: string, candidate: string): number {
+	const suffix = commonSuffix(answer, candidate);
+	const lengthGap = Math.abs([...candidate].length - [...answer].length);
+	return (SUFFIX_MAX - suffix) * 100 + lengthGap;
+}
+
 /**
  * 選択肢を作る。正解を必ず含み、全部で CHOICE_COUNT 個まで。
  * own は札に書いた自前の誤答(裏を答える向きでだけ使う。表を答える向きでは他の札の表だけから作る)。
+ * 他の札から補うときは、正解だけが長い(短い)と見た目で当てられるため、長さの近い候補から選ぶ。
  * 候補が正解のほかに 1 つも無ければ null(四択にできないので記述で出す)
  */
 export function buildChoices(answer: string, own: string[], pool: string[], rand: Rand = Math.random): string[] | null {
 	const mine = own.filter((c) => c !== answer);
-	const others = shuffle(
+	const candidates = shuffle(
 		pool.filter((b) => b !== answer && !mine.includes(b)),
 		rand,
 	);
+	// 並べ替えは安定なので、同じ点数の候補の順は shuffle の結果が残る
+	const near = candidates
+		.map((c, i) => ({ c, i, d: similarity(answer, c) }))
+		.sort((a, b) => a.d - b.d || a.i - b.i)
+		.slice(0, NEAR_POOL)
+		.map((x) => x.c);
+	const others = shuffle(near, rand);
 	const wrong = [...mine, ...others].slice(0, CHOICE_COUNT - 1);
 	if (wrong.length === 0) return null;
 	return shuffle([answer, ...wrong], rand);
+}
+
+/**
+ * 正解が誤答のどれよりも長い札の数。長さで当てられる札を取り込みの前に知らせる
+ */
+export function countLongestAnswer(cards: { back: string; choices: string[] }[]): number {
+	return cards.filter((c) => c.choices.length > 0 && c.choices.every((x) => [...x].length < [...c.back].length)).length;
 }
 
 /**

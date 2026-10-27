@@ -124,29 +124,50 @@ cardRoutes.post("/decks/:deckId/cards/import", async (c) => {
 			throw new ValidationError(`選択肢は${LIMITS.choices}件まで、1件${LIMITS.choice}文字以内にしてください`);
 		}
 	}
+	// 同じ表の札が既にあれば、裏・補足・タグ・選択肢を書き換える(学習の進み具合は保つ)。
+	// 見本の誤答や補足を直して取り込み直すときに、札を消して作り直さずに済ませるため。同じ表が複数あれば作成順の先頭だけ
+	const existing = await db
+		.select({ id: cards.id, front: cards.front })
+		.from(cards)
+		.where(eq(cards.deckId, deckId))
+		.orderBy(asc(cards.createdAt));
+	const idByFront = new Map<string, string>();
+	for (const row of existing) if (!idByFront.has(row.front)) idByFront.set(row.front, row.id);
+
 	// 本番の D1 は1つの SQL に結び付けられる値が 100 個までのため、複数行をまとめた INSERT は使えない。
-	// 1行ずつの INSERT を batch で1回の往復にまとめる(手元の SQLite はこの制限が無く、テストでは気付けない)
+	// 1行ずつの文を batch で1回の往復にまとめる(手元の SQLite はこの制限が無く、テストでは気付けない)
 	const now = new Date().toISOString();
 	const BATCH = 100;
 	let inserted = 0;
+	let updated = 0;
+	// 取り込みの中で同じ表が重なったときは、後の行で前の行を上書きする
+	const seen = new Set<string>();
 	for (let i = 0; i < parsed.length; i += BATCH) {
-		const statements = parsed.slice(i, i + BATCH).map((p, j) =>
-			db.insert(cards).values({
+		const statements = parsed.slice(i, i + BATCH).map((p, j) => {
+			const fields = { back: p.back, note: p.note, tags: p.tags.slice(0, LIMITS.tags), choices: p.choices };
+			const id = idByFront.get(p.front);
+			if (id) {
+				updated++;
+				return db.update(cards).set({ ...fields, updatedAt: now }).where(eq(cards.id, id));
+			}
+			if (seen.has(p.front)) {
+				updated++;
+				return db.update(cards).set({ ...fields, updatedAt: now }).where(and(eq(cards.deckId, deckId), eq(cards.front, p.front)));
+			}
+			seen.add(p.front);
+			inserted++;
+			return db.insert(cards).values({
 				deckId,
 				userId: actor.id,
 				front: p.front,
-				back: p.back,
-				note: p.note,
-				tags: p.tags.slice(0, LIMITS.tags),
-				choices: p.choices,
+				...fields,
 				// 作成順(= 取り込みの行順)を保つため、ミリ秒を1ずつずらす
 				createdAt: new Date(Date.parse(now) + i + j).toISOString(),
-			}),
-		);
+			});
+		});
 		await db.batch(statements as [(typeof statements)[number], ...typeof statements]);
-		inserted += statements.length;
 	}
-	return c.json({ inserted, skipped }, 201);
+	return c.json({ inserted, updated, skipped }, 201);
 });
 
 /** TSV の書き出し。スプレッドシートに貼り付けられる形 */

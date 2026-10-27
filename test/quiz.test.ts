@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildChoices, buildHint, CHEER_WORDS, CHOICE_COUNT, pickSide, rollCheer, shuffle, sides } from "../src/lib/quiz";
+import { buildChoices, buildHint, CHEER_WORDS, CHOICE_COUNT, commonSuffix, countLongestAnswer, pickSide, rollCheer, shuffle, sides, similarity } from "../src/lib/quiz";
 
 /** 乱数を固定する。常に 0 を返すと shuffle は末尾から順に先頭へ回す */
 const zero = () => 0;
@@ -25,8 +25,51 @@ describe("buildChoices", () => {
 		expect(buildChoices("正", [], ["正"], zero)).toBeNull();
 	});
 
+	it("他の札から補うときは、正解と長さの近い候補を優先する", () => {
+		const pool = ["あ", "あい", "あいう", "あいうえ", "あいうえお", "あいうえおか", "あいうえおかき", "あいうえおかきく"];
+		const r = buildChoices("かきくけこ", [], pool, zero)!;
+		expect(r).toHaveLength(CHOICE_COUNT);
+		// 5 文字の正解に対し、長さの近い 4 件だけが候補に残る
+		for (const c of r) expect(["かきくけこ", "あいう", "あいうえ", "あいうえお", "あいうえおか", "あいうえおかき"]).toContain(c);
+	});
+
+	it("語尾が同じ候補を、長さが近いだけの候補より優先する", () => {
+		const pool = ["伝送制御プロトコル", "長さだけ近い別の語", "鍵交換のプロトコル", "経路制御プロトコル", "短い語", "とても長い説明の文がここに続く", "似ていない語", "別の語"];
+		const r = buildChoices("名前解決のプロトコル", [], pool, zero)!;
+		// 候補に残る 4 件のうち 3 件が同じ語尾なので、誤答 3 件のうち 2 件以上は同じ語尾になる
+		expect(r.filter((c) => c.endsWith("プロトコル")).length).toBeGreaterThanOrEqual(3);
+		expect(r).not.toContain("短い語");
+		expect(r).not.toContain("とても長い説明の文がここに続く");
+	});
+
 	it("shuffle は要素を増減させない", () => {
 		expect(shuffle([1, 2, 3, 4], zero).sort()).toEqual([1, 2, 3, 4]);
+	});
+});
+
+describe("similarity", () => {
+	it("commonSuffix は末尾から一致する文字数を上限つきで数える", () => {
+		expect(commonSuffix("TCP", "UDP")).toBe(1);
+		expect(commonSuffix("中間者攻撃", "標的型攻撃")).toBe(2);
+		expect(commonSuffix("abcdef", "xbcdef")).toBe(4);
+		expect(commonSuffix("TCP", "DNS")).toBe(0);
+	});
+	it("語尾の一致が長さの差より強く効く", () => {
+		expect(similarity("TCP", "UDP")).toBeLessThan(similarity("TCP", "DNS"));
+		expect(similarity("TCP", "UDP")).toBeLessThan(similarity("TCP", "SNMP"));
+		expect(similarity("TCP", "SNMP")).toBeLessThan(similarity("TCP", "DNS"));
+	});
+});
+
+describe("countLongestAnswer", () => {
+	it("正解がどの誤答よりも長い札だけを数える。選択肢が無い札は数えない", () => {
+		expect(
+			countLongestAnswer([
+				{ back: "長い正解の文", choices: ["短い", "短め"] },
+				{ back: "正解", choices: ["同じ長さの誤答", "短"] },
+				{ back: "長い正解の文", choices: [] },
+			]),
+		).toBe(1);
 	});
 });
 

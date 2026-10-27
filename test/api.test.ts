@@ -156,7 +156,7 @@ describe("札", () => {
 		const tsv = "表\t裏\t補足\tタグ\nOSI\t7階層\t\tモデル\nTCP\t伝送制御\t第4層\t\n裏なし\n";
 		const imp = await call("POST", `/api/decks/${deck.id}/cards/import`, { text: tsv });
 		expect(imp.status).toBe(201);
-		expect(imp.body).toEqual({ inserted: 2, skipped: 1 });
+		expect(imp.body).toEqual({ inserted: 2, updated: 0, skipped: 1 });
 
 		const exp = await call("GET", `/api/decks/${deck.id}/cards/export`);
 		expect(exp.status).toBe(200);
@@ -171,13 +171,29 @@ describe("札", () => {
 		expect(empty.status).toBe(400);
 	});
 
+	it("同じ表の札は取り込み直しで裏・補足・タグ・選択肢が書き換わり、学習の進み具合は残る", async () => {
+		const deck = await createDeck();
+		await call("POST", `/api/decks/${deck.id}/cards/import`, { text: "Q1\t旧い裏\t\t\t誤1\nQ2\t裏2\n" });
+		const before = (await call("GET", `/api/decks/${deck.id}/cards`)).body as { cards: { id: string; front: string }[] };
+		const q1 = before.cards.find((c) => c.front === "Q1")!;
+		const reviewed = await call("POST", `/api/cards/${q1.id}/review`, { json: { rating: "good", today: TODAY } });
+		expect(reviewed.status).toBe(200);
+
+		const again = await call("POST", `/api/decks/${deck.id}/cards/import`, { text: "Q1\t新しい裏\t補足\tタグ\t誤A|誤B\nQ3\t裏3\nQ3\t裏3の訂正\n" });
+		expect(again.body).toEqual({ inserted: 1, updated: 2, skipped: 0 });
+		const after = (await call("GET", `/api/decks/${deck.id}/cards`)).body as { cards: Json[] };
+		expect(after.cards).toHaveLength(3);
+		expect(after.cards.find((c) => c["front"] === "Q1")).toMatchObject({ id: q1.id, back: "新しい裏", note: "補足", tags: ["タグ"], choices: ["誤A", "誤B"], state: "review", reps: 1 });
+		expect(after.cards.find((c) => c["front"] === "Q3")).toMatchObject({ back: "裏3の訂正" });
+	});
+
 	it("150 行の取り込みは batch の区切りをまたいでも行順を保つ", async () => {
 		// 本番の D1 は1文の値が 100 個までのため、複数行の INSERT はここでは再現できない。batch の分割だけを通す
 		const deck = await createDeck();
 		const rows = Array.from({ length: 150 }, (_, i) => `表${i}\t裏${i}\t\tt${i % 3}`).join("\n");
 		const imp = await call("POST", `/api/decks/${deck.id}/cards/import`, { text: `${rows}\n` });
 		expect(imp.status).toBe(201);
-		expect(imp.body).toEqual({ inserted: 150, skipped: 0 });
+		expect(imp.body).toEqual({ inserted: 150, updated: 0, skipped: 0 });
 		const list = (await call("GET", `/api/decks/${deck.id}/cards`)).body as { cards: { front: string }[] };
 		expect(list.cards).toHaveLength(150);
 		// 一覧は新しい順のため、取り込みの行順の逆になる
